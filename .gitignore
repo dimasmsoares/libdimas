@@ -1,0 +1,14 @@
+# Arquivos compilados
+*.o
+*.a
+*.so
+*.exe
+*.out
+
+# Pastas de build
+build/
+lib/
+
+# Arquivos temporários
+*.log
+*.tmp
