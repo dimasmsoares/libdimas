@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <string.h>
 #include "../include/libdimas.h"
@@ -13,7 +14,7 @@ int main() {
 
     // Chamando o menu
     printf("Iniciando teste do menu...\n");
-    escolha = menu(cm);
+    escolha = menu(&cm);
 
     // Exibindo o resultado
     printf("\nOpcao escolhida: %d\n", escolha);

@@ -3,136 +3,98 @@
 #include <stdlib.h>
 #include "libdimas.h"
 
-int log_ctrl = 0;
-
-int menu(ConfigMenu cm)
+int menu(const ConfigMenu *cm) // Recebe ponteiro
 {
-    // Variável que armazenará o valor retornado (o número da opção escolhida)
-    int valorRetornado;
-
-    // Variável que contará a quantidade de opções
-    int countOpcoes;
-    
-    // Variável que indicará se a entrada é válida (=1)
+    int valorRetornado = 0;
+    int countOpcoes = 0;
     int entradaValida;
-    
-    // Variável usada para que a função strtok possa manipular as opções sem alterar cm.opcoes
-    char temp[256];             
-
-    // Variável que indicará o tamanho do buff
-    int tam_buff;
-    
-    char *res = NULL;
-
+    char temp[256]; 
     char *buff = NULL;
-
-    do
-    {
-        valorRetornado = 0;
-        countOpcoes = 0;
-        entradaValida = 1;
-        strcpy(temp, cm.opcoes);
-        tam_buff = 0;
-        res = NULL;
-        buff = NULL;
-
-        // Imprimindo o Menu
-        system("clear");
-        printf("%s\n", cm.titulo);
-        res = strtok(temp, cm.separador);
-        while (res != NULL)
-        {
-            printf("[%d] - %s\n", ++countOpcoes, res);
-            res = strtok(NULL, cm.separador);
-        }
-
-        // Verificando quantas opções tem e qual o tamanho necessário para o buff (buff tem que capturar o '\n')
-        tam_buff = (countOpcoes/10) + 3;    // digitos + '\n' + '\0'
-        if(log_ctrl) printf("tam_buff = %d, pois temos %d opções.\n", tam_buff, countOpcoes);
-
-        // Limpa o buff
-        buff = (char *)malloc(tam_buff*sizeof(char));
-        memset(buff, 0, tam_buff);
-
-        if(log_ctrl)
-        {
-            for(int i = 0; i < tam_buff; i++)
-            {   
-                if(buff[i] != '\n' && buff[i] != '\0') printf("[%p] %c\n", &buff[i], buff[i]);
-                else
-                {
-                    if(buff[i] == '\n') printf("[%p] ENTER\n", &buff[i]);
-                    else printf("[%p] NULL\n", &buff[i]);
-                }
-            } // Fim do for
-        }
-        
-
-        printf("Selecione a opção desejada: ");
-        if(fgets(buff, tam_buff, stdin) == NULL)
-        {
-            if(log_ctrl) printf("[menu] Erro no fgets\n");
-        }
-
-        // Verifica se o ENTER ('\n') foi capturado
-        int enter_position = (int)strcspn(buff,"\n");
-        if(enter_position >= tam_buff-1)
-        {
-            if(log_ctrl) printf("O ENTER não foi capturado pelo buff\n");
-            entradaValida = 0;
-            while(getchar() != '\n');   // Limpa o buffer de entrada
-        }
-        else
-        {
-            if(log_ctrl) printf("O ENTER está na posição %d\n", enter_position);
-            // Verifica se os caracteres antes do ENTER são numéricos
-            for(int i = 0; i < enter_position; i++)
-            {
-                if(buff[i] < '0' || buff[i] > '9')
-                {
-                    entradaValida = 0;
-                    if(log_ctrl) printf("O caractere na posição %d não é númerico\n", i);
-                    break;
-                }
-
-            }
-            if(entradaValida)
-            {
-                if(log_ctrl) printf("O(s) caracter(es) é(são) númerico(s)\n");
-                valorRetornado = atoi(buff);
-            }
-            if(valorRetornado > countOpcoes || valorRetornado <= 0)
-            {
-                entradaValida = 0;
-                valorRetornado = 0;
-                printf("O valor da entrada tem que estar entre 0 e %d\n", countOpcoes);
-            }
-        }
-
-        if(entradaValida)
-        {
-            if(log_ctrl) printf("Entrada Válida\n");
-        } 
-        else
-        { 
-            if(log_ctrl) printf("Entrada Inválida\n");
-        }
-
-        if(log_ctrl)
-        {
-            for(int i = 0; i < tam_buff; i++)
-            {   
-                if(buff[i] != '\n' && buff[i] != '\0') printf("[%p] %c\n", &buff[i], buff[i]);
-                else
-                {
-                    if(buff[i] == '\n') printf("[%p] ENTER\n", &buff[i]);
-                    else printf("[%p] NULL\n", &buff[i]);
-                }
-            }        
-        }
-    } while (entradaValida == 0);
+    char *res = NULL;
     
+    // 1. PREPARAÇÃO (Feita apenas uma vez)
+    // Precisamos contar as opções ANTES de entrar no loop para alocar o buffer corretamente
+    strcpy(temp, cm->opcoes);
+    res = strtok(temp, cm->separador);
+    while (res != NULL) {
+        countOpcoes++;
+        res = strtok(NULL, cm->separador);
+    }
+
+    // Calcula tamanho do buffer (digitos + \n + \0)
+    // Melhoria: snprintf(NULL, 0, "%d", countOpcoes) daria o tamanho exato de digitos, 
+    // mas sua lógica /10 + 3 funciona bem para inteiros simples.
+    int tam_buff = (countOpcoes / 10) + 3;
+
+    // ALOCAÇÃO FORA DO LOOP (Evita Memory Leak)
+    buff = (char *)malloc(tam_buff * sizeof(char));
+    if (!buff) {
+        fprintf(stderr, "Erro de alocação de memória.\n");
+        return -1;
+    }
+
+    // 2. LOOP DE INTERAÇÃO
+    do {
+        entradaValida = 1; // Assume válido até provar o contrário
+        
+        // Limpa a tela (Linux/Unix)
+        // Dica: Sequências ANSI são mais leves que system("clear")
+        printf("\033[H\033[J"); 
+
+        printf("%s\n", cm->titulo);
+        
+        // Re-tokenizar para imprimir (pois strtok destrói a string original na 1ª passada)
+        strcpy(temp, cm->opcoes);
+        int i = 0;
+        res = strtok(temp, cm->separador);
+        while (res != NULL) {
+            printf("[%d] - %s\n", ++i, res);
+            res = strtok(NULL, cm->separador);
+        }
+
+        printf("Selecione a opcao: ");
+        
+        // Limpa buffer alocado antes de usar
+        memset(buff, 0, tam_buff); 
+
+        if (fgets(buff, tam_buff, stdin) == NULL) {
+             entradaValida = 0; // Erro de leitura
+        } else {
+            // Verifica o \n
+            size_t len = strlen(buff);
+            if (len > 0 && buff[len-1] != '\n') {
+                // Buffer estourou (usuário digitou demais)
+                entradaValida = 0;
+                // Limpa o resto do stdin
+                int ch;
+                while ((ch = getchar()) != '\n' && ch != EOF);
+                printf("Erro: Entrada muito longa.\n");
+            } else {
+                // Remove o \n se existir para o atoi funcionar limpo
+                buff[strcspn(buff, "\n")] = 0;
+                
+                // Validação numérica simples
+                char *endptr;
+                valorRetornado = (int)strtol(buff, &endptr, 10); // strtol é mais seguro que atoi
+                
+                if (endptr == buff || *endptr != '\0') {
+                    // Não converteu nada ou tem lixo (ex: "1a")
+                    entradaValida = 0;
+                    printf("Erro: Digite apenas numeros.\n");
+                } else if (valorRetornado < 1 || valorRetornado > countOpcoes) {
+                    entradaValida = 0;
+                    printf("Opcao invalida (1-%d).\n", countOpcoes);
+                }
+            }
+        }
+
+        if (!entradaValida) {
+            printf("Pressione ENTER para tentar novamente...");
+            getchar(); // Pausa para o usuário ler o erro
+        }
+
+    } while (!entradaValida);
+
     free(buff);
-    if(log_ctrl) printf("valorRetornado = %d\n", valorRetornado);
     return valorRetornado;
 }
